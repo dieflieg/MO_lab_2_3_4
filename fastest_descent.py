@@ -5,9 +5,35 @@ from tabulate import tabulate
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 
-# --- Метод золотого сечения для одномерной минимизации ---
+# --- Поиск интервала, содержащего минимум функции ---
+def find_minimum_interval(f, x0, delta=1e-2, max_iter=50):
+    x1 = x0 + delta
+    f0 = f(x0)
+    f1 = f(x1)
+
+    if f1 > f0:
+        delta = -delta
+        x1 = x0 + delta
+        f1 = f(x1)
+        if f1 > f0:
+            return (x1, x0) if x1 < x0 else (x0, x1)
+
+    k = 1
+    while k < max_iter:
+        delta *= 2
+        x2 = x1 + delta
+        f2 = f(x2)
+        if f2 > f1:
+            return (x0, x2) if x0 < x2 else (x2, x0)
+        x0, x1 = x1, x2
+        f0, f1 = f1, f2
+        k += 1
+
+    raise RuntimeError("Не удалось найти интервал минимума за отведенное число итераций")
+
+# --- Метод золотого сечения ---
 def golden_section_search(f, a, b, tol=1e-6):
-    phi = (1 + np.sqrt(5)) / 2  # Золотое сечение
+    phi = (1 + np.sqrt(5)) / 2
     resphi = 2 - phi
     x1 = a + resphi * (b - a)
     x2 = b - resphi * (b - a)
@@ -29,31 +55,29 @@ def golden_section_search(f, a, b, tol=1e-6):
     return (a + b) / 2
 
 # --- Метод наискорейшего спуска ---
-def steepest_descent_method(f, grad_f, x0, radius=2, tol=1e-4, max_iter=1000):
-    x = np.array(x0, dtype=float)  # Начальная точка
-    table = []  # Таблица для хранения результатов
-    path = [x.copy()]  # Траектория движения
+def steepest_descent_method(f, grad_f, x0, tol=1e-4, max_iter=1000):
+    x = np.array(x0, dtype=float)
+    table = []
+    path = [x.copy()]
 
     for k in range(max_iter):
-        grad = grad_f(x)  # Градиент функции в текущей точке
-        direction = -grad / np.linalg.norm(grad)  # Нормированное направление наискорейшего спуска
+        grad = grad_f(x)
+        direction = -grad / np.linalg.norm(grad)
 
-        # Одномерная минимизация вдоль направления спуска
         f_line = lambda alpha: f(x + alpha * direction)
-        alpha = golden_section_search(f_line, -radius, radius, tol)
+        a, b = find_minimum_interval(f_line, 0.0)
+        alpha = golden_section_search(f_line, a, b, tol)
 
-        s = alpha * direction  # Шаг
-        x_new = x + s  # Новая точка
+        s = alpha * direction
+        x_new = x + s
 
-        # Сохранение результатов
         table.append([k + 1, x[0], x[1], f(x), alpha, np.linalg.norm(s)])
         path.append(x_new.copy())
 
-        # Критерий останова
         if np.linalg.norm(s) < tol or np.linalg.norm(grad) < tol:
             break
 
-        x = x_new  # Переход к следующей итерации
+        x = x_new
 
     print(tabulate(table, headers=["Iter", "x1", "x2", "f(x)", "alpha", "||s||"], floatfmt=".10f", tablefmt="grid"))
     return x, np.array(path)
@@ -118,13 +142,13 @@ def plot_contour(f, path, title, xlim=(-3, 3), ylim=(-1, 5)):
 
 # --- Запуск метода для f1 ---
 print("\nМинимизация f1 методом наискорейшего спуска:")
-res1, path1 = steepest_descent_method(f1, grad_f1, [0, 0], radius=2.5)
+res1, path1 = steepest_descent_method(f1, grad_f1, [0, 0])
 plot_3d(f1, path1, "Минимизация f1 методом наискорейшего спуска", xlim=(-3, 6), ylim=(-1, 9))
 plot_contour(f1, path1, "Линии уровня f1 и траектория оптимизации", xlim=(-2, 8), ylim=(-1, 9))
 
 # --- Запуск метода для f2 ---
 print("\nМинимизация f2 методом наискорейшего спуска:")
-res2, path2 = steepest_descent_method(f2, grad_f2, [-1.2, 1], radius=2.5)
+res2, path2 = steepest_descent_method(f2, grad_f2, [-1.2, 1])
 plot_3d(f2, path2, "Минимизация f2 методом наискорейшего спуска")
 plot_contour(f2, path2, "Линии уровня f2 и траектория оптимизации")
 
